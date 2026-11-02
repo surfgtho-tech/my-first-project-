@@ -14,13 +14,14 @@ env:
   DESTINOS: "BKK HKT"
   IDA_INICIO: "2026-12-07"
   IDA_FIM: "2026-12-10"
-  VOLTA_INICIO: ""           # ex.: "2027-01-05" (vazio = só ida)
-  VOLTA_FIM: ""              # ex.: "2027-01-08"
-  PRECO_ALVO: "480"          # só manda e-mail se achar preço <= este (EUR)
+  VOLTA_INICIO: "2027-01-05"
+  VOLTA_FIM: "2027-01-15"
+  PRECO_ALVO: "1000"         # manda e-mail se achar ida e volta <= 1000 EUR
 
 jobs:
   buscar:
     runs-on: ubuntu-latest
+    timeout-minutes: 60        # são ~88 buscas (4 idas x 11 voltas x 2 destinos)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
