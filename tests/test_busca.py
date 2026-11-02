@@ -1,6 +1,7 @@
 import unittest
 
 from buscador_passagens.busca import buscar_flexivel, gerar_datas, mais_barata_por_dia
+from buscador_passagens.alerta import montar_email
 from buscador_passagens.duffel import ClienteDuffel, _formatar_duracao
 from buscador_passagens.simulado import ClienteSimulado
 
@@ -33,11 +34,13 @@ class TestBusca(unittest.TestCase):
                 {"origin": {"iata_code": "DUB"}, "destination": {"iata_code": "DOH"},
                  "departing_at": "2026-12-07T10:00:00", "arriving_at": "2026-12-07T19:00:00",
                  "marketing_carrier": {"name": "Qatar Airways", "iata_code": "QR"},
-                 "marketing_carrier_flight_number": "18"},
+                 "marketing_carrier_flight_number": "18",
+                 "passengers": [{"baggages": [{"type": "checked", "quantity": 1}]}]},
                 {"origin": {"iata_code": "DOH"}, "destination": {"iata_code": "BKK"},
                  "departing_at": "2026-12-07T21:00:00", "arriving_at": "2026-12-08T07:05:00",
                  "marketing_carrier": {"name": "Qatar Airways", "iata_code": "QR"},
-                 "marketing_carrier_flight_number": "832"},
+                 "marketing_carrier_flight_number": "832",
+                 "passengers": [{"baggages": [{"type": "carry_on", "quantity": 1}]}]},
             ]}],
         }
         o = ClienteDuffel._converter(oferta_api, "BKK", "2026-12-07")
@@ -45,6 +48,31 @@ class TestBusca(unittest.TestCase):
         self.assertEqual(o.rota, "DUB → DOH → BKK")
         self.assertEqual(o.conexoes, 1)
         self.assertEqual(o.trechos[1].numero_voo, "QR832")
+        self.assertEqual(o.trechos[0].malas_despachadas, 1)
+        self.assertFalse(o.bagagem_incluida)  # 2º voo não tem mala despachada
+
+
+    def test_ida_e_volta(self):
+        ofertas = buscar_flexivel(ClienteSimulado(), "DUB", ["BKK"],
+                                  "2026-12-07", "2026-12-08",
+                                  volta_inicio="2026-12-08", volta_fim="2026-12-09")
+        # combinações válidas: 07↔08, 07↔09, 08↔09 (volta igual à ida é ignorada)
+        self.assertEqual(set(mais_barata_por_dia(ofertas)),
+                         {"2026-12-07 ↔ 2026-12-08", "2026-12-07 ↔ 2026-12-09",
+                          "2026-12-08 ↔ 2026-12-09"})
+        self.assertTrue(all(o.trechos_volta for o in ofertas))
+
+    def test_filtro_bagagem(self):
+        ofertas = buscar_flexivel(ClienteSimulado(), "DUB", ["BKK"],
+                                  "2026-12-07", "2026-12-10", so_com_bagagem=True)
+        self.assertTrue(ofertas)
+        self.assertTrue(all(o.bagagem_incluida for o in ofertas))
+
+    def test_email(self):
+        ofertas = buscar_flexivel(ClienteSimulado(), "DUB", ["BKK"], "2026-12-07", "2026-12-07")
+        assunto, corpo = montar_email(ofertas, "DUB → BKK")
+        self.assertIn(str(ofertas[0].preco), assunto)
+        self.assertIn("1. ", corpo)
 
 
 if __name__ == "__main__":

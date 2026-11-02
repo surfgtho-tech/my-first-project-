@@ -25,6 +25,31 @@ def _formatar_duracao(iso: str | None) -> str:
     return f"{dias * 24 + horas}h {minutos}m"
 
 
+def _malas_despachadas(segmento: dict) -> int:
+    """Malas despachadas incluídas para o 1º passageiro neste voo."""
+    passageiros = segmento.get("passengers") or []
+    if not passageiros:
+        return 0
+    return sum(b.get("quantity", 0) for b in passageiros[0].get("baggages", [])
+               if b.get("type") == "checked")
+
+
+def _converter_trechos(slice_api: dict) -> list[Trecho]:
+    return [
+        Trecho(
+            origem=s["origin"]["iata_code"],
+            destino=s["destination"]["iata_code"],
+            partida=datetime.fromisoformat(s["departing_at"]),
+            chegada=datetime.fromisoformat(s["arriving_at"]),
+            companhia=s["marketing_carrier"]["name"],
+            numero_voo=f'{s["marketing_carrier"]["iata_code"]}'
+                       f'{s.get("marketing_carrier_flight_number", "")}',
+            malas_despachadas=_malas_despachadas(s),
+        )
+        for s in slice_api["segments"]
+    ]
+
+
 class ClienteDuffel:
     def __init__(self, token: str, timeout: int = 60):
         self.timeout = timeout
@@ -37,15 +62,16 @@ class ClienteDuffel:
         })
 
     def buscar(self, origem: str, destino: str, data_ida: str,
-               adultos: int = 1, max_conexoes: int = 1,
-               cabine: str = "economy") -> list[Oferta]:
+               data_volta: str | None = None, adultos: int = 1,
+               max_conexoes: int = 1, cabine: str = "economy") -> list[Oferta]:
+        slices = [{"origin": origem, "destination": destino,
+                   "departure_date": data_ida}]
+        if data_volta:
+            slices.append({"origin": destino, "destination": origem,
+                           "departure_date": data_volta})
         corpo = {
             "data": {
-                "slices": [{
-                    "origin": origem,
-                    "destination": destino,
-                    "departure_date": data_ida,
-                }],
+                "slices": slices,
                 "passengers": [{"type": "adult"} for _ in range(adultos)],
                 "cabin_class": cabine,
                 "max_connections": max_conexoes,
@@ -59,29 +85,23 @@ class ClienteDuffel:
             raise ErroDuffel(f"Erro {resposta.status_code}: {resposta.text[:300]}")
 
         ofertas_api = resposta.json()["data"].get("offers", [])
-        return [self._converter(o, destino, data_ida) for o in ofertas_api]
+        return [self._converter(o, destino, data_ida, data_volta) for o in ofertas_api]
 
     @staticmethod
-    def _converter(oferta: dict, destino: str, data_ida: str) -> Oferta:
-        trecho_api = oferta["slices"][0]
-        trechos = [
-            Trecho(
-                origem=s["origin"]["iata_code"],
-                destino=s["destination"]["iata_code"],
-                partida=datetime.fromisoformat(s["departing_at"]),
-                chegada=datetime.fromisoformat(s["arriving_at"]),
-                companhia=s["marketing_carrier"]["name"],
-                numero_voo=f'{s["marketing_carrier"]["iata_code"]}'
-                           f'{s.get("marketing_carrier_flight_number", "")}',
-            )
-            for s in trecho_api["segments"]
-        ]
-        return Oferta(
+    def _converter(oferta: dict, destino: str, data_ida: str,
+                   data_volta: str | None = None) -> Oferta:
+        slices = oferta["slices"]
+        resultado = Oferta(
             preco=Decimal(oferta["total_amount"]),
             moeda=oferta["total_currency"],
             companhia=oferta["owner"]["name"],
             destino=destino,
             data_ida=data_ida,
-            trechos=trechos,
-            duracao=_formatar_duracao(trecho_api.get("duration")),
+            trechos=_converter_trechos(slices[0]),
+            duracao=_formatar_duracao(slices[0].get("duration")),
         )
+        if data_volta and len(slices) > 1:
+            resultado.data_volta = data_volta
+            resultado.trechos_volta = _converter_trechos(slices[1])
+            resultado.duracao_volta = _formatar_duracao(slices[1].get("duration"))
+        return resultado

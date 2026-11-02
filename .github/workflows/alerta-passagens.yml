@@ -1,0 +1,40 @@
+# Roda a busca automaticamente todo dia e manda e-mail com o melhor preço.
+# Segredos necessários (GitHub > Settings > Secrets and variables > Actions):
+#   DUFFEL_ACCESS_TOKEN, ALERTA_EMAIL, SMTP_USUARIO, SMTP_SENHA
+name: Alerta de passagens
+
+on:
+  schedule:
+    - cron: "17 7 * * *"   # todo dia às 07:17 UTC
+  workflow_dispatch:         # botão "Run workflow" para rodar na hora
+
+env:
+  # ✏️ Edite aqui as datas e o preço da viagem
+  ORIGEM: DUB
+  DESTINOS: "BKK HKT"
+  IDA_INICIO: "2026-12-07"
+  IDA_FIM: "2026-12-10"
+  VOLTA_INICIO: ""           # ex.: "2027-01-05" (vazio = só ida)
+  VOLTA_FIM: ""              # ex.: "2027-01-08"
+  PRECO_ALVO: "480"          # só manda e-mail se achar preço <= este (EUR)
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Buscar e alertar
+        env:
+          DUFFEL_ACCESS_TOKEN: ${{ secrets.DUFFEL_ACCESS_TOKEN }}
+          ALERTA_EMAIL: ${{ secrets.ALERTA_EMAIL }}
+          SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
+          SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
+        run: |
+          ARGS="--origem $ORIGEM --destinos $DESTINOS --data-inicio $IDA_INICIO --data-fim $IDA_FIM --alerta"
+          if [ -n "$VOLTA_INICIO" ]; then ARGS="$ARGS --volta-inicio $VOLTA_INICIO --volta-fim ${VOLTA_FIM:-$VOLTA_INICIO}"; fi
+          if [ -n "$PRECO_ALVO" ]; then ARGS="$ARGS --preco-alvo $PRECO_ALVO"; fi
+          python -m buscador_passagens $ARGS
