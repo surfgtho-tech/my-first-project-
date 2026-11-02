@@ -1,12 +1,16 @@
-# Roda a busca automaticamente todo dia e manda e-mail com o melhor preço.
+# Roda a busca automaticamente e manda e-mail com o melhor preço.
 # Segredos necessários (GitHub > Settings > Secrets and variables > Actions):
-#   DUFFEL_ACCESS_TOKEN, ALERTA_EMAIL, BREVO_API_KEY, REMETENTE_EMAIL
+#   SERPAPI_KEY (preços do Google Flights) — ou DUFFEL_ACCESS_TOKEN
+#   ALERTA_EMAIL, BREVO_API_KEY, REMETENTE_EMAIL
 #   (ou SMTP_USUARIO + SMTP_SENHA no lugar da Brevo)
 name: Alerta de passagens
 
 on:
   schedule:
-    - cron: "17 7 * * *"   # todo dia às 07:17 UTC
+    # Toda segunda e quinta às 07:17 UTC. Cada execução gasta ~24 buscas
+    # (4 idas x 6 voltas). Se o seu plano grátis tiver poucas buscas por mês,
+    # deixe só um dia: "17 7 * * 1"
+    - cron: "17 7 * * 1,4"
   workflow_dispatch:         # botão "Run workflow" para rodar na hora
 
 env:
@@ -17,12 +21,13 @@ env:
   IDA_FIM: "2026-12-10"
   VOLTA_INICIO: "2027-01-05"
   VOLTA_FIM: "2027-01-15"
+  INTERVALO_VOLTA: "2"       # testa a volta a cada 2 dias (5, 7, 9, 11, 13, 15)
   PRECO_ALVO: "1000"         # manda e-mail se achar ida e volta <= 1000 EUR
 
 jobs:
   buscar:
     runs-on: ubuntu-latest
-    timeout-minutes: 60        # são ~44 buscas (4 idas x 11 voltas x 1 destino)
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,6 +36,7 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Buscar e alertar
         env:
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
           DUFFEL_ACCESS_TOKEN: ${{ secrets.DUFFEL_ACCESS_TOKEN }}
           ALERTA_EMAIL: ${{ secrets.ALERTA_EMAIL }}
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
@@ -39,6 +45,6 @@ jobs:
           SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
         run: |
           ARGS="--origem $ORIGEM --destinos $DESTINOS --data-inicio $IDA_INICIO --data-fim $IDA_FIM --alerta"
-          if [ -n "$VOLTA_INICIO" ]; then ARGS="$ARGS --volta-inicio $VOLTA_INICIO --volta-fim ${VOLTA_FIM:-$VOLTA_INICIO}"; fi
+          if [ -n "$VOLTA_INICIO" ]; then ARGS="$ARGS --volta-inicio $VOLTA_INICIO --volta-fim ${VOLTA_FIM:-$VOLTA_INICIO} --intervalo-volta ${INTERVALO_VOLTA:-1}"; fi
           if [ -n "$PRECO_ALVO" ]; then ARGS="$ARGS --preco-alvo $PRECO_ALVO"; fi
           python -m buscador_passagens $ARGS

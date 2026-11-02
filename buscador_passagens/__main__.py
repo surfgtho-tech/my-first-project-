@@ -37,6 +37,8 @@ def main(argv=None) -> int:
     p.add_argument("--data-fim", help="Última data de ida (padrão: igual à primeira)")
     p.add_argument("--volta-inicio", help="Primeira data de volta (ativa ida e volta)")
     p.add_argument("--volta-fim", help="Última data de volta (padrão: igual à primeira)")
+    p.add_argument("--intervalo-volta", type=int, default=1,
+                   help="Testa a volta a cada N dias (economiza buscas). Padrão: 1")
     p.add_argument("--adultos", type=int, default=1)
     p.add_argument("--max-conexoes", type=int, default=1)
     p.add_argument("--com-bagagem", action="store_true",
@@ -51,18 +53,23 @@ def main(argv=None) -> int:
 
     carregar_env()
     token = os.environ.get("DUFFEL_ACCESS_TOKEN")
+    chave_serpapi = os.environ.get("SERPAPI_KEY")
 
     if args.simulado:
         from .simulado import ClienteSimulado
         cliente = ClienteSimulado()
         print("🧪 MODO SIMULADO — os preços abaixo são inventados.\n")
+    elif chave_serpapi:
+        from .serpapi import ClienteSerpApi
+        cliente = ClienteSerpApi(chave_serpapi)
+        print("🔍 Fonte: Google Flights (SerpApi)\n")
     elif token:
         from .duffel import ClienteDuffel
         cliente = ClienteDuffel(token)
         if token.startswith("duffel_test"):
             print("🧪 Token de TESTE da Duffel — os resultados não são preços reais.\n")
     else:
-        print("Nenhum DUFFEL_ACCESS_TOKEN encontrado.\n"
+        print("Nenhuma chave encontrada (SERPAPI_KEY ou DUFFEL_ACCESS_TOKEN).\n"
               "Crie um arquivo .env (veja .env.example) ou rode com --simulado.")
         return 1
 
@@ -72,7 +79,7 @@ def main(argv=None) -> int:
         cliente, origem, destinos, args.data_inicio, args.data_fim or args.data_inicio,
         volta_inicio=args.volta_inicio, volta_fim=args.volta_fim,
         adultos=args.adultos, max_conexoes=args.max_conexoes,
-        so_com_bagagem=args.com_bagagem,
+        so_com_bagagem=args.com_bagagem, intervalo_volta=args.intervalo_volta,
         ao_buscar=lambda o, d, ida, volta: print(
             f"🔎 Buscando {o} → {d} ida {ida}" + (f", volta {volta}" if volta else "") + "..."),
     )

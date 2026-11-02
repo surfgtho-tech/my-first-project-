@@ -4,24 +4,30 @@ from datetime import date, timedelta
 from .modelos import Oferta
 
 
-def gerar_datas(inicio: str, fim: str | None = None) -> list[str]:
-    """Lista todas as datas entre início e fim (inclusive)."""
+def gerar_datas(inicio: str, fim: str | None = None, intervalo: int = 1) -> list[str]:
+    """Lista as datas entre início e fim (inclusive), pulando de `intervalo` em
+    `intervalo` dias. A data final sempre entra."""
     d_inicio = date.fromisoformat(inicio)
     d_fim = date.fromisoformat(fim) if fim else d_inicio
     if d_fim < d_inicio:
         raise ValueError("A data final deve ser igual ou depois da inicial.")
     dias = (d_fim - d_inicio).days
-    return [(d_inicio + timedelta(days=i)).isoformat() for i in range(dias + 1)]
+    datas = [(d_inicio + timedelta(days=i)).isoformat()
+             for i in range(0, dias + 1, max(intervalo, 1))]
+    if datas[-1] != d_fim.isoformat():
+        datas.append(d_fim.isoformat())
+    return datas
 
 
 def buscar_flexivel(cliente, origem: str, destinos: list[str],
                     data_inicio: str, data_fim: str,
                     volta_inicio: str | None = None, volta_fim: str | None = None,
                     adultos: int = 1, max_conexoes: int = 1,
-                    so_com_bagagem: bool = False, ao_buscar=None) -> list[Oferta]:
+                    so_com_bagagem: bool = False, intervalo_volta: int = 1,
+                    ao_buscar=None) -> list[Oferta]:
     """Faz uma busca para cada combinação (ida x volta x destino) e junta tudo,
     ordenado do mais barato para o mais caro."""
-    datas_volta: list[str | None] = gerar_datas(volta_inicio, volta_fim) if volta_inicio else [None]
+    datas_volta: list[str | None] = gerar_datas(volta_inicio, volta_fim, intervalo_volta) if volta_inicio else [None]
     todas: list[Oferta] = []
     for data_ida in gerar_datas(data_inicio, data_fim):
         for data_volta in datas_volta:
@@ -36,7 +42,8 @@ def buscar_flexivel(cliente, origem: str, destinos: list[str],
                 except Exception as erro:  # uma falha não derruba a busca inteira
                     print(f"  ⚠️  Falha em {origem}→{destino} {data_ida}/{data_volta}: {erro}")
     if so_com_bagagem:
-        todas = [o for o in todas if o.bagagem_incluida]
+        # ofertas sem informação de bagagem são mantidas (confira no site)
+        todas = [o for o in todas if o.bagagem_incluida or not o.bagagem_conhecida]
     return sorted(todas, key=lambda o: o.preco)
 
 

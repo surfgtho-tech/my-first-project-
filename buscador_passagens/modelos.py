@@ -35,6 +35,7 @@ class Oferta:
     data_volta: str | None = None
     trechos_volta: list[Trecho] = field(default_factory=list)    # voos da volta
     duracao_volta: str = ""
+    bagagem_conhecida: bool = True   # False quando a fonte não informa bagagem
 
     @property
     def ida_e_volta(self) -> bool:
@@ -60,9 +61,14 @@ class Oferta:
 
     def resumo(self) -> str:
         """Uma linha de texto descrevendo a oferta."""
-        bagagem = "com mala" if self.bagagem_incluida else "sem mala"
+        if not self.bagagem_conhecida:
+            bagagem = "bagagem: ver no site"
+        else:
+            bagagem = "com mala" if self.bagagem_incluida else "sem mala"
         texto = (f"{self.preco} {self.moeda} | {self.companhia} | "
                  f"ida {self.data_ida} {self.rota} ({self.duracao})")
         if self.ida_e_volta:
-            texto += f" | volta {self.data_volta} {self.rota_volta} ({self.duracao_volta})"
+            texto += f" | volta {self.data_volta}"
+            if self.trechos_volta:
+                texto += f" {self.rota_volta} ({self.duracao_volta})"
         return f"{texto} | {bagagem}"

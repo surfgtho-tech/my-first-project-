@@ -4,6 +4,7 @@ from unittest.mock import patch
 from buscador_passagens.busca import buscar_flexivel, gerar_datas, mais_barata_por_dia
 from buscador_passagens.alerta import ConfigEmailFaltando, enviar_email, montar_email
 from buscador_passagens.duffel import ClienteDuffel, _formatar_duracao
+from buscador_passagens.serpapi import ClienteSerpApi
 from buscador_passagens.simulado import ClienteSimulado
 
 
@@ -74,6 +75,41 @@ class TestBusca(unittest.TestCase):
         assunto, corpo = montar_email(ofertas, "DUB → BKK")
         self.assertIn(str(ofertas[0].preco), assunto)
         self.assertIn("1. ", corpo)
+
+    def test_intervalo_volta(self):
+        self.assertEqual(gerar_datas("2027-01-05", "2027-01-15", 2),
+                         ["2027-01-05", "2027-01-07", "2027-01-09",
+                          "2027-01-11", "2027-01-13", "2027-01-15"])
+        self.assertEqual(gerar_datas("2027-01-05", "2027-01-08", 2),
+                         ["2027-01-05", "2027-01-07", "2027-01-08"])
+
+
+class TestSerpApi(unittest.TestCase):
+    @patch("buscador_passagens.serpapi.requests.get")
+    def test_converter(self, get):
+        get.return_value.status_code = 200
+        get.return_value.content = b"x"
+        get.return_value.json.return_value = {
+            "best_flights": [{"price": 912, "total_duration": 1090, "flights": [
+                {"departure_airport": {"id": "DUB", "time": "2026-12-08 10:15"},
+                 "arrival_airport": {"id": "DOH", "time": "2026-12-08 19:40"},
+                 "airline": "Qatar Airways", "flight_number": "QR 18"},
+                {"departure_airport": {"id": "DOH", "time": "2026-12-08 21:10"},
+                 "arrival_airport": {"id": "MNL", "time": "2026-12-09 11:25"},
+                 "airline": "Qatar Airways", "flight_number": "QR 934"},
+            ]}],
+            "other_flights": [],
+        }
+        ofertas = ClienteSerpApi("chave").buscar("DUB", "MNL", "2026-12-08", "2027-01-07")
+        params = get.call_args.kwargs["params"]
+        self.assertEqual(params["type"], 1)
+        self.assertEqual(params["return_date"], "2027-01-07")
+        o = ofertas[0]
+        self.assertEqual(str(o.preco), "912")
+        self.assertEqual(o.rota, "DUB → DOH → MNL")
+        self.assertEqual(o.duracao, "18h 10m")
+        self.assertEqual(o.trechos[1].numero_voo, "QR934")
+        self.assertIn("ver no site", o.resumo())
 
 
 class TestEnvioEmail(unittest.TestCase):
