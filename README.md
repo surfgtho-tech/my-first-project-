@@ -17,7 +17,6 @@ python -m buscador_passagens --simulado --data-inicio 2026-12-07 --data-fim 2026
 # 2) Com a API da Duffel
 cp .env.example .env      # e coloque seu token no arquivo .env
 python -m buscador_passagens --data-inicio 2026-12-07 --data-fim 2026-12-10
-```
 
 # 3) Ida e volta, só tarifas com mala, e-mail se custar até 900 EUR
 python -m buscador_passagens --data-inicio 2026-12-07 --data-fim 2026-12-10 \
