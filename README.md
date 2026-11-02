@@ -4,7 +4,7 @@ App de linha de comando em Python que procura a passagem mais barata
 **em várias datas e destinos de uma vez**. Usa a API da [Duffel](https://duffel.com),
 que traz tarifas direto das companhias aéreas (NDC).
 
-Exemplo de uso: Dublin (DUB) → Tailândia (Bangkok BKK / Phuket HKT), ida entre os dias 7 e 10.
+Exemplo de uso: Dublin (DUB) → Manila, Filipinas (MNL – Ninoy Aquino International Airport).
 
 ## Como rodar
 
@@ -29,7 +29,7 @@ Opções úteis:
 | Opção | Padrão | O que faz |
 |---|---|---|
 | `--origem` | `DUB` | Aeroporto de saída |
-| `--destinos` | `BKK HKT` | Um ou mais destinos |
+| `--destinos` | `MNL` | Um ou mais destinos |
 | `--adultos` | `1` | Número de passageiros |
 | `--max-conexoes` | `1` | Máximo de conexões (0 = só voo direto) |
 | `--top` | `10` | Quantas ofertas mostrar |
@@ -44,9 +44,10 @@ O arquivo `.github/workflows/alerta-passagens.yml` roda a busca uma vez por dia
 e manda e-mail quando acha um preço bom. Para ativar:
 
 1. No GitHub: **Settings → Secrets and variables → Actions → New repository secret** e crie:
-   `DUFFEL_ACCESS_TOKEN`, `ALERTA_EMAIL`, `SMTP_USUARIO`, `SMTP_SENHA`.
-2. `SMTP_SENHA` no Gmail é uma **senha de app** (Conta Google → Segurança →
-   Senhas de app; precisa da verificação em 2 etapas ligada).
+   `DUFFEL_ACCESS_TOKEN`, `ALERTA_EMAIL`, `BREVO_API_KEY`, `REMETENTE_EMAIL`.
+2. A chave da Brevo fica em **brevo.com → SMTP & API → API Keys**; o
+   `REMETENTE_EMAIL` é o e-mail que você confirmou na Brevo.
+   (Alternativa: Gmail com `SMTP_USUARIO` + `SMTP_SENHA` = senha de app.)
 3. Edite as datas e o `PRECO_ALVO` no topo do arquivo do workflow.
 4. Teste na aba **Actions → Alerta de passagens → Run workflow**.
 

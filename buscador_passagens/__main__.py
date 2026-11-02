@@ -31,8 +31,8 @@ def carregar_env(caminho: str = ".env") -> None:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="Busca a passagem mais barata em várias datas.")
     p.add_argument("--origem", default="DUB", help="Aeroporto de origem (padrão: DUB)")
-    p.add_argument("--destinos", nargs="+", default=["BKK", "HKT"],
-                   help="Um ou mais aeroportos de destino (padrão: BKK HKT)")
+    p.add_argument("--destinos", nargs="+", default=["MNL"],
+                   help="Um ou mais aeroportos de destino (padrão: MNL - Manila)")
     p.add_argument("--data-inicio", required=True, help="Primeira data de ida (AAAA-MM-DD)")
     p.add_argument("--data-fim", help="Última data de ida (padrão: igual à primeira)")
     p.add_argument("--volta-inicio", help="Primeira data de volta (ativa ida e volta)")
@@ -94,7 +94,7 @@ def main(argv=None) -> int:
         if args.preco_alvo is not None and melhor.preco > args.preco_alvo:
             print(f"\n📭 Melhor preço {melhor.preco} acima do alvo {args.preco_alvo} — sem e-mail.")
             return 0
-        from .alerta import ConfigEmailFaltando, enviar_email, montar_email
+        from .alerta import ConfigEmailFaltando, ErroEnvioEmail, enviar_email, montar_email
         tipo = "ida e volta" if args.volta_inicio else "só ida"
         titulo = f"{origem} → {'/'.join(destinos)} ({tipo})"
         if args.simulado:
@@ -104,6 +104,9 @@ def main(argv=None) -> int:
             destinatarios = enviar_email(assunto, corpo)
         except ConfigEmailFaltando as erro:
             print(f"\n❌ {erro} (veja .env.example)")
+            return 1
+        except ErroEnvioEmail as erro:
+            print(f"\n❌ Falha ao enviar e-mail: {erro}")
             return 1
         print(f"\n📧 Alerta enviado para {len(destinatarios)} destinatário(s).")
     return 0

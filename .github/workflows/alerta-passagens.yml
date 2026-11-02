@@ -1,6 +1,7 @@
 # Roda a busca automaticamente todo dia e manda e-mail com o melhor preço.
 # Segredos necessários (GitHub > Settings > Secrets and variables > Actions):
-#   DUFFEL_ACCESS_TOKEN, ALERTA_EMAIL, SMTP_USUARIO, SMTP_SENHA
+#   DUFFEL_ACCESS_TOKEN, ALERTA_EMAIL, BREVO_API_KEY, REMETENTE_EMAIL
+#   (ou SMTP_USUARIO + SMTP_SENHA no lugar da Brevo)
 name: Alerta de passagens
 
 on:
@@ -11,7 +12,7 @@ on:
 env:
   # ✏️ Edite aqui as datas e o preço da viagem
   ORIGEM: DUB
-  DESTINOS: "BKK HKT"
+  DESTINOS: "MNL"            # Manila - Ninoy Aquino International Airport
   IDA_INICIO: "2026-12-07"
   IDA_FIM: "2026-12-10"
   VOLTA_INICIO: "2027-01-05"
@@ -21,7 +22,7 @@ env:
 jobs:
   buscar:
     runs-on: ubuntu-latest
-    timeout-minutes: 60        # são ~88 buscas (4 idas x 11 voltas x 2 destinos)
+    timeout-minutes: 60        # são ~44 buscas (4 idas x 11 voltas x 1 destino)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,6 +33,8 @@ jobs:
         env:
           DUFFEL_ACCESS_TOKEN: ${{ secrets.DUFFEL_ACCESS_TOKEN }}
           ALERTA_EMAIL: ${{ secrets.ALERTA_EMAIL }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          REMETENTE_EMAIL: ${{ secrets.REMETENTE_EMAIL }}
           SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
           SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
         run: |

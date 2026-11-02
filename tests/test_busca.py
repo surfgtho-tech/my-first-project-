@@ -1,7 +1,8 @@
 import unittest
+from unittest.mock import patch
 
 from buscador_passagens.busca import buscar_flexivel, gerar_datas, mais_barata_por_dia
-from buscador_passagens.alerta import montar_email
+from buscador_passagens.alerta import ConfigEmailFaltando, enviar_email, montar_email
 from buscador_passagens.duffel import ClienteDuffel, _formatar_duracao
 from buscador_passagens.simulado import ClienteSimulado
 
@@ -73,6 +74,24 @@ class TestBusca(unittest.TestCase):
         assunto, corpo = montar_email(ofertas, "DUB → BKK")
         self.assertIn(str(ofertas[0].preco), assunto)
         self.assertIn("1. ", corpo)
+
+
+class TestEnvioEmail(unittest.TestCase):
+    @patch.dict("os.environ", {"ALERTA_EMAIL": "a@x.com, b@x.com",
+                               "BREVO_API_KEY": "chave", "REMETENTE_EMAIL": "eu@x.com"}, clear=True)
+    @patch("buscador_passagens.alerta.requests.post")
+    def test_brevo(self, post):
+        post.return_value.status_code = 201
+        self.assertEqual(enviar_email("assunto", "corpo"), ["a@x.com", "b@x.com"])
+        corpo = post.call_args.kwargs["json"]
+        self.assertEqual(corpo["to"], [{"email": "a@x.com"}, {"email": "b@x.com"}])
+        self.assertEqual(corpo["sender"]["email"], "eu@x.com")
+        self.assertEqual(post.call_args.kwargs["headers"]["api-key"], "chave")
+
+    @patch.dict("os.environ", {"ALERTA_EMAIL": "a@x.com"}, clear=True)
+    def test_sem_configuracao(self):
+        with self.assertRaises(ConfigEmailFaltando):
+            enviar_email("assunto", "corpo")
 
 
 if __name__ == "__main__":
